@@ -13,16 +13,20 @@ const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET!;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const TZ = 'Asia/Kolkata';
-const IST_OFFSET_MIN = 330; // +05:30
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-// Parse natural language in IST. Trick: shift "now" back by 5:30 so that when
-// chrono interprets relative dates against UTC, we get the IST wall-clock result.
 function parseIST(raw: string): Date | null {
-  const shiftedNow = new Date(Date.now() - IST_OFFSET_MIN * 60 * 1000);
-  const parsed = chrono.parseDate(raw, shiftedNow);
-  if (!parsed) return null;
-  // parsed is now in "IST wall-clock but labelled UTC" — add the offset back to get the true UTC instant.
-  return new Date(parsed.getTime() + IST_OFFSET_MIN * 60 * 1000);
+  // Get current IST wall-clock date as if it were UTC
+  const nowUTC = Date.now();
+  const nowISTShifted = new Date(nowUTC + IST_OFFSET_MS);
+
+  // chrono parses against this shifted "now" so relative words (today/tomorrow/9am)
+  // land on the correct IST calendar day and clock time.
+  const parsedShifted = chrono.parseDate(raw, nowISTShifted, { forwardDate: true });
+  if (!parsedShifted) return null;
+
+  // parsedShifted is IST wall-clock labelled as UTC. Subtract offset to get real UTC instant.
+  return new Date(parsedShifted.getTime() - IST_OFFSET_MS);
 }
 
 async function send(chat_id: string | number, text: string) {

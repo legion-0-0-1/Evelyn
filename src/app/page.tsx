@@ -1,4 +1,5 @@
 import { getTasks } from '@/lib/sheets';
+import LogoutButton from './LogoutButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,17 +70,7 @@ export default async function Home() {
               Everyday Virtual Executive for Lists &amp; Your Nudges
             </p>
           </div>
-          <a
-            href="/api/logout"
-            onClick={async (e) => {
-              e.preventDefault();
-              await fetch('/api/logout', { method: 'POST' });
-              window.location.href = '/login';
-            }}
-            style={{ color: '#666', fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}
-          >
-            logout
-          </a>
+          <LogoutButton />
         </header>
 
         {error ? (
