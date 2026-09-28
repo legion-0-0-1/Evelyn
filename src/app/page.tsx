@@ -1,16 +1,21 @@
-import { getTasks, getActiveTasks } from '@/lib/sheets';
+import { getTasks } from '@/lib/sheets';
 
-export const dynamic = 'force-dynamic'; // always fresh, never cached
+export const dynamic = 'force-dynamic';
+
+const TZ = 'Asia/Kolkata';
 
 function fmtDate(iso: string) {
   if (!iso) return '—';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleString('en-IN', {
-    day: '2-digit',
+    weekday: 'short',
+    day: 'numeric',
     month: 'short',
-    hour: '2-digit',
+    hour: 'numeric',
     minute: '2-digit',
+    hour12: true,
+    timeZone: TZ,
   });
 }
 
@@ -33,8 +38,9 @@ export default async function Home() {
   const active = tasks.filter((t) => t.status !== 'done');
   const done = tasks.filter((t) => t.status === 'done');
   const now = new Date().toISOString();
-  const overdue = active.filter((t) => t.deadline && t.deadline < now);
-  const today = active.filter((t) => t.deadline && t.deadline.slice(0, 10) === now.slice(0, 10));
+  const today = now.slice(0, 10);
+  const overdue = active.filter((t) => t.deadline && t.deadline < now && !t.deadline.startsWith(today));
+  const dueToday = active.filter((t) => t.deadline && t.deadline.startsWith(today));
 
   return (
     <main
@@ -47,13 +53,33 @@ export default async function Home() {
       }}
     >
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <header style={{ marginBottom: 32 }}>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>
-            Evelyn <span style={{ color: '#16a34a' }}>●</span>
-          </h1>
-          <p style={{ margin: '4px 0 0', color: '#888', fontSize: 14 }}>
-            Everyday Virtual Executive for Lists &amp; Your Nudges
-          </p>
+        <header
+          style={{
+            marginBottom: 32,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+          }}
+        >
+          <div>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>
+              Evelyn <span style={{ color: '#16a34a' }}>●</span>
+            </h1>
+            <p style={{ margin: '4px 0 0', color: '#888', fontSize: 14 }}>
+              Everyday Virtual Executive for Lists &amp; Your Nudges
+            </p>
+          </div>
+          <a
+            href="/api/logout"
+            onClick={async (e) => {
+              e.preventDefault();
+              await fetch('/api/logout', { method: 'POST' });
+              window.location.href = '/login';
+            }}
+            style={{ color: '#666', fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}
+          >
+            logout
+          </a>
         </header>
 
         {error ? (
@@ -71,7 +97,6 @@ export default async function Home() {
           </div>
         ) : (
           <>
-            {/* Stat cards */}
             <div
               style={{
                 display: 'grid',
@@ -82,7 +107,7 @@ export default async function Home() {
             >
               <Stat label="Active" value={active.length} />
               <Stat label="Overdue" value={overdue.length} color="#ef4444" />
-              <Stat label="Due today" value={today.length} color="#eab308" />
+              <Stat label="Due today" value={dueToday.length} color="#eab308" />
               <Stat label="Completed" value={done.length} color="#16a34a" />
             </div>
 
@@ -108,17 +133,20 @@ export default async function Home() {
               {done.length === 0 ? (
                 <Empty text="Nothing completed yet." />
               ) : (
-                done.slice(-10).reverse().map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    id={t.id}
-                    title={t.title}
-                    deadline={t.completed_at}
-                    status={t.status}
-                    priority={t.priority}
-                    progress={t.progress}
-                  />
-                ))
+                done
+                  .slice(-10)
+                  .reverse()
+                  .map((t) => (
+                    <TaskRow
+                      key={t.id}
+                      id={t.id}
+                      title={t.title}
+                      deadline={t.completed_at}
+                      status={t.status}
+                      priority={t.priority}
+                      progress={t.progress}
+                    />
+                  ))
               )}
             </Section>
 
@@ -131,7 +159,7 @@ export default async function Home() {
                 paddingTop: 16,
               }}
             >
-              {tasks.length} total tasks · refreshed {new Date().toLocaleTimeString('en-IN')}
+              {tasks.length} total tasks · refreshed {new Date().toLocaleTimeString('en-IN', { timeZone: TZ })}
             </footer>
           </>
         )}
@@ -212,11 +240,19 @@ function TaskRow({
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {title}
         </div>
         <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>
-          <code style={{ color: '#666' }}>{id}</code>
+          <code style={{ color: '#666' }}>#{id}</code>
           {deadline && ` · ${fmtDate(deadline)}`}
           {progress && ` · ${progress}`}
         </div>
@@ -233,11 +269,6 @@ function TaskRow({
       >
         {priority}
       </span>
-      <a href="/api/logout" onClick={async (e) => {
-  e.preventDefault();
-  await fetch('/api/logout', { method: 'POST' });
-  window.location.href = '/login';
-}} style={{ color: '#666', cursor: 'pointer' }}>logout</a>
     </div>
   );
 }

@@ -4,6 +4,27 @@ import { getActiveTasks, appendLog } from '@/lib/sheets';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const CRON_SECRET = process.env.CRON_SECRET!;
+const TZ = 'Asia/Kolkata';
+
+function fmtDeadline(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: TZ,
+  });
+}
+
+const fmt = (t: any) =>
+  `• \`#${t.id}\` *${t.title}*${t.deadline ? ` — 📅 ${fmtDeadline(t.deadline)}` : ''}${
+    t.progress ? ` — ${t.progress}` : ''
+  }`;
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization');
@@ -12,15 +33,12 @@ export async function GET(req: NextRequest) {
   }
 
   const tasks = await getActiveTasks();
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const today = nowIso.slice(0, 10);
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10);
 
-  const overdue = tasks.filter((t) => t.deadline && t.deadline < nowIso && !t.deadline.startsWith(today));
+  const overdue = tasks.filter((t) => t.deadline && t.deadline < now && !t.deadline.startsWith(today));
   const dueToday = tasks.filter((t) => t.deadline && t.deadline.startsWith(today));
   const upcoming = tasks.filter((t) => !overdue.includes(t) && !dueToday.includes(t));
-
-  const fmt = (t: any) => `• \`${t.id}\` *${t.title}*${t.deadline ? ` — 📅 ${t.deadline}` : ''}${t.progress ? ` — ${t.progress}` : ''}`;
 
   let text = '☀️ *Good morning — here is your day*\n\n';
   if (overdue.length) text += `🔴 *Overdue*\n${overdue.map(fmt).join('\n')}\n\n`;

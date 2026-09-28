@@ -12,6 +12,18 @@ const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET!;
 const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
 const TG_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+const TZ = 'Asia/Kolkata';
+const IST_OFFSET_MIN = 330; // +05:30
+
+// Parse natural language in IST. Trick: shift "now" back by 5:30 so that when
+// chrono interprets relative dates against UTC, we get the IST wall-clock result.
+function parseIST(raw: string): Date | null {
+  const shiftedNow = new Date(Date.now() - IST_OFFSET_MIN * 60 * 1000);
+  const parsed = chrono.parseDate(raw, shiftedNow);
+  if (!parsed) return null;
+  // parsed is now in "IST wall-clock but labelled UTC" — add the offset back to get the true UTC instant.
+  return new Date(parsed.getTime() + IST_OFFSET_MIN * 60 * 1000);
+}
 
 async function send(chat_id: string | number, text: string) {
   await fetch(`${TG_API}/sendMessage`, {
@@ -21,14 +33,32 @@ async function send(chat_id: string | number, text: string) {
   });
 }
 
+function fmtDeadline(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: TZ,
+  });
+}
+
 function fmtTask(t: { id: string; title: string; deadline: string; status: string; progress: string }) {
-  const dl = t.deadline ? ` — 📅 ${t.deadline}` : '';
+  const dl = t.deadline ? ` — 📅 ${fmtDeadline(t.deadline)}` : '';
   const pr = t.progress ? ` — ${t.progress}` : '';
-  return `• \`${t.id}\` *${t.title}*${dl}${pr}`;
+  return `• \`#${t.id}\` *${t.title}*${dl}${pr}`;
+}
+
+function cleanId(raw: string): string {
+  return raw.trim().replace(/^#/, '').toLowerCase();
 }
 
 export async function POST(req: NextRequest) {
-  // Verify Telegram secret header
   const secret = req.headers.get('x-telegram-bot-api-secret-token');
   if (secret !== WEBHOOK_SECRET) {
     return NextResponse.json({ ok: false }, { status: 401 });
@@ -51,7 +81,10 @@ export async function POST(req: NextRequest) {
   try {
     switch (cmd) {
       case '/start':
-        await send(chatId, `👋 Hi, I'm *Evelyn*.\nYour chat ID: \`${chatId}\`\n\nTry \`/add Call vendor ; tomorrow 5pm\``);
+        await send(
+          chatId,
+          `👋 Hi, I'm *Evelyn*.\nYour chat ID: \`${chatId}\`\n\nTry \`/add Call vendor ; tomorrow 5pm\``
+        );
         break;
 
       case '/add': {
@@ -60,7 +93,7 @@ export async function POST(req: NextRequest) {
           break;
         }
         const [title, deadlineRaw] = args.split(';').map((s) => s.trim());
-        const parsed = deadlineRaw ? chrono.parseDate(deadlineRaw) : null;
+        const parsed = deadlineRaw ? parseIST(deadlineRaw) : null;
         const deadline = parsed ? parsed.toISOString() : '';
         const task = await addTask({ title, deadline });
         await send(chatId, `✅ Added:\n${fmtTask(task)}`);
@@ -80,24 +113,27 @@ export async function POST(req: NextRequest) {
       case '/today': {
         const tasks = await getActiveTasks();
         const now = new Date().toISOString();
-        const overdue = tasks.filter((t) => t.deadline && t.deadline < now);
-        const today = tasks.filter((t) => t.deadline && t.deadline.slice(0, 10) === now.slice(0, 10));
-        const upcoming = tasks.filter((t) => !overdue.includes(t) && !today.includes(t));
+        const today = now.slice(0, 10);
+        const overdue = tasks.filter((t) => t.deadline && t.deadline < now && !t.deadline.startsWith(today));
+        const dueToday = tasks.filter((t) => t.deadline && t.deadline.startsWith(today));
+        const upcoming = tasks.filter((t) => !overdue.includes(t) && !dueToday.includes(t));
+
         let out = '☀️ *Today*\n\n';
         if (overdue.length) out += `🔴 *Overdue*\n${overdue.map(fmtTask).join('\n')}\n\n`;
-        if (today.length) out += `🟡 *Due today*\n${today.map(fmtTask).join('\n')}\n\n`;
+        if (dueToday.length) out += `🟡 *Due today*\n${dueToday.map(fmtTask).join('\n')}\n\n`;
         if (upcoming.length) out += `🟢 *Upcoming*\n${upcoming.map(fmtTask).join('\n')}`;
-        if (!overdue.length && !today.length && !upcoming.length) out += 'Nothing. 🎉';
+        if (!overdue.length && !dueToday.length && !upcoming.length) out += 'Nothing. 🎉';
         await send(chatId, out);
         break;
       }
 
       case '/progress': {
-        const [id, ...note] = args.split(' ');
-        if (!id || !note.length) {
-          await send(chatId, 'Usage: `/progress <id> <note or %>`');
+        const [idRaw, ...note] = args.split(' ');
+        if (!idRaw || !note.length) {
+          await send(chatId, 'Usage: `/progress <#id> <note or %>`');
           break;
         }
+        const id = cleanId(idRaw);
         const t = await updateTask(id, { progress: note.join(' ') });
         await send(chatId, t ? `📝 Updated:\n${fmtTask(t)}` : '❌ Task not found.');
         break;
@@ -105,20 +141,20 @@ export async function POST(req: NextRequest) {
 
       case '/done': {
         if (!args) {
-          await send(chatId, 'Usage: `/done <id>`');
+          await send(chatId, 'Usage: `/done <#id>`');
           break;
         }
-        const t = await completeTask(args.trim());
+        const t = await completeTask(cleanId(args));
         await send(chatId, t ? `✅ Done: *${t.title}*` : '❌ Task not found.');
         break;
       }
 
       case '/delete': {
         if (!args) {
-          await send(chatId, 'Usage: `/delete <id>`');
+          await send(chatId, 'Usage: `/delete <#id>`');
           break;
         }
-        const ok = await deleteTask(args.trim());
+        const ok = await deleteTask(cleanId(args));
         await send(chatId, ok ? '🗑️ Deleted.' : '❌ Task not found.');
         break;
       }

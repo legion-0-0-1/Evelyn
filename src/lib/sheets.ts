@@ -77,7 +77,7 @@ export async function addTask(input: {
 }): Promise<Task> {
   const sheet = await getTasksSheet();
   const task: Task = {
-    id: nanoid(6),
+    id: nanoid(6).toLowerCase(),
     title: input.title,
     description: input.description ?? '',
     deadline: input.deadline ?? '',
