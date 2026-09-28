@@ -3,22 +3,7 @@ import LogoutButton from './LogoutButton';
 
 export const dynamic = 'force-dynamic';
 
-const TZ = 'Asia/Kolkata';
-
-function fmtDate(iso: string) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: TZ,
-  });
-}
+import { fmtIST } from '@/lib/greetings';
 
 function statusColor(s: string) {
   if (s === 'done') return '#16a34a';
@@ -115,6 +100,7 @@ export default async function Home() {
                     status={t.status}
                     priority={t.priority}
                     progress={t.progress}
+                    recurrence={t.recurrence}
                   />
                 ))
               )}
@@ -136,6 +122,7 @@ export default async function Home() {
                       status={t.status}
                       priority={t.priority}
                       progress={t.progress}
+                      recurrence={t.recurrence}
                     />
                   ))
               )}
@@ -150,7 +137,7 @@ export default async function Home() {
                 paddingTop: 16,
               }}
             >
-              {tasks.length} total tasks · refreshed {new Date().toLocaleTimeString('en-IN', { timeZone: TZ })}
+              {tasks.length} total tasks · refreshed {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}
             </footer>
           </>
         )}
@@ -201,6 +188,7 @@ function TaskRow({
   status,
   priority,
   progress,
+  recurrence,
 }: {
   id: string;
   title: string;
@@ -208,6 +196,7 @@ function TaskRow({
   status: string;
   priority: string;
   progress: string;
+  recurrence: string;
 }) {
   return (
     <div
@@ -244,10 +233,23 @@ function TaskRow({
         </div>
         <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>
           <code style={{ color: '#666' }}>#{id}</code>
-          {deadline && ` · ${fmtDate(deadline)}`}
+          {deadline && ` · ${fmtIST(deadline)}`}
           {progress && ` · ${progress}`}
         </div>
       </div>
+      {recurrence && (
+        <span
+          style={{
+            fontSize: 11,
+            padding: '2px 8px',
+            borderRadius: 4,
+            background: '#1a2e1a',
+            color: '#4ade80',
+          }}
+        >
+          🔁 {recurrence}
+        </span>
+      )}
       <span
         style={{
           fontSize: 11,
