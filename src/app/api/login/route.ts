@@ -6,12 +6,8 @@ export async function POST(req: NextRequest) {
   const secret = process.env.DASHBOARD_COOKIE_SECRET;
 
   if (!expected || !secret) {
-  return NextResponse.json({ 
-    error: 'server misconfigured', 
-    hasExpected: !!expected, 
-    hasSecret: !!secret 
-  }, { status: 500 });
-}
+    return NextResponse.json({ error: 'server misconfigured' }, { status: 500 });
+  }
 
   if (password !== expected) {
     // small delay to slow brute force
