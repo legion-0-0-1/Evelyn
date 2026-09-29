@@ -5,12 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default function Home() {
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        padding: '40px 32px 80px',
-      }}
-    >
+    <main style={{ minHeight: '100vh', padding: '40px 32px 80px' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
         <header
           style={{
@@ -20,27 +15,35 @@ export default function Home() {
             alignItems: 'center',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 20,
-                fontWeight: 700,
-                color: '#08080a',
-                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)',
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                backgroundImage: 'url(/evelyn.jpg)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                border: '1px solid #253048',
+                boxShadow: '0 0 24px rgba(96, 165, 250, 0.2), inset 0 0 0 1px rgba(255,255,255,0.05)',
+                flexShrink: 0,
               }}
-            >
-              E
-            </div>
+            />
             <div>
-              <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.3 }}>Evelyn</div>
-              <div style={{ fontSize: 12, color: '#5a5a63', marginTop: 1 }}>
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 600,
+                  letterSpacing: -0.3,
+                  background: 'linear-gradient(135deg, #eaeef5 0%, #8b95a8 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                Evelyn
+              </div>
+              <div style={{ fontSize: 12, color: '#5a6478', marginTop: 2, letterSpacing: 0.2 }}>
                 Everyday Virtual Executive
               </div>
             </div>

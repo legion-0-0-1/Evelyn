@@ -33,8 +33,8 @@ function LoginForm() {
     <main
       style={{
         minHeight: '100vh',
-        background: '#0a0a0a',
-        color: '#e5e5e5',
+        background: 'radial-gradient(ellipse at top, #0f1a2e 0%, #060810 60%)',
+        color: '#eaeef5',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -45,18 +45,32 @@ function LoginForm() {
       <form
         onSubmit={submit}
         style={{
-          background: '#141414',
-          border: '1px solid #1f1f1f',
-          borderRadius: 12,
-          padding: 32,
+          background: '#0c1018',
+          border: '1px solid #1a2333',
+          borderRadius: 18,
+          padding: 36,
           width: '100%',
-          maxWidth: 340,
+          maxWidth: 360,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(96, 165, 250, 0.08)',
         }}
       >
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 600 }}>
-          Evelyn <span style={{ color: '#16a34a' }}>●</span>
-        </h1>
-        <p style={{ margin: '0 0 24px', color: '#888', fontSize: 13 }}>Enter access code</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 20,
+              backgroundImage: 'url(/evelyn.jpg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              border: '1px solid #253048',
+              boxShadow: '0 0 32px rgba(96, 165, 250, 0.25)',
+              marginBottom: 16,
+            }}
+          />
+          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.3 }}>Evelyn</div>
+          <div style={{ fontSize: 12, color: '#5a6478', marginTop: 4 }}>Enter access code</div>
+        </div>
 
         <input
           type="password"
@@ -66,35 +80,36 @@ function LoginForm() {
           placeholder="••••••••"
           style={{
             width: '100%',
-            padding: '10px 12px',
-            background: '#0a0a0a',
-            border: '1px solid #2a2a2a',
-            borderRadius: 6,
-            color: '#e5e5e5',
+            padding: '11px 14px',
+            background: '#060810',
+            border: '1px solid #1a2333',
+            borderRadius: 10,
+            color: '#eaeef5',
             fontSize: 14,
             outline: 'none',
             boxSizing: 'border-box',
+            textAlign: 'center',
+            letterSpacing: 2,
           }}
         />
 
-        {error && (
-          <div style={{ color: '#f87171', fontSize: 12, marginTop: 10 }}>{error}</div>
-        )}
+        {error && <div style={{ color: '#f87171', fontSize: 12, marginTop: 10, textAlign: 'center' }}>{error}</div>}
 
         <button
           type="submit"
           disabled={loading || !password}
           style={{
             width: '100%',
-            marginTop: 16,
-            padding: '10px 12px',
-            background: loading || !password ? '#1f1f1f' : '#16a34a',
-            color: loading || !password ? '#666' : '#0a0a0a',
+            marginTop: 18,
+            padding: '11px 12px',
+            background: loading || !password ? '#131822' : 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
+            color: loading || !password ? '#5a6478' : '#060810',
             border: 'none',
-            borderRadius: 6,
+            borderRadius: 10,
             fontSize: 14,
             fontWeight: 600,
             cursor: loading || !password ? 'not-allowed' : 'pointer',
+            letterSpacing: 0.2,
           }}
         >
           {loading ? 'Checking…' : 'Unlock'}
