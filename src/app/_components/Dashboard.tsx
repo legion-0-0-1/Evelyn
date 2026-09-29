@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import StatsCards from './StatsCards';
 import Filters from './Filters';
 import TaskList from './TaskList';
+import Calendar from './Calendar';
+import Charts from './Charts';
+import DayDrawer from './DayDrawer';
 
 export type FilterState = {
   status: 'all' | 'active' | 'done' | 'overdue';
@@ -23,6 +26,7 @@ export default function Dashboard() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dayView, setDayView] = useState<{ date: string; tasks: any[] } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -38,7 +42,6 @@ export default function Dashboard() {
       const data = await res.json();
       setTasks(data.tasks);
 
-      // derive tag list from unfiltered active tasks once
       if (!allTags.length) {
         const all = await fetch('/api/tasks?status=all').then((r) => r.json());
         const set = new Set<string>();
@@ -62,7 +65,21 @@ export default function Dashboard() {
   return (
     <>
       <StatsCards refreshKey={filters} />
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(280px, 1fr) minmax(0, 2fr)',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <Calendar onDayClick={(date, tasks) => setDayView({ date, tasks })} />
+        <Charts />
+      </div>
+
       <Filters filters={filters} onChange={setFilters} allTags={allTags} />
+
       {error && (
         <div
           style={{
@@ -78,7 +95,10 @@ export default function Dashboard() {
           <strong>Error:</strong> {error}
         </div>
       )}
+
       <TaskList tasks={tasks} loading={loading} onRefresh={load} />
+
+      {dayView && <DayDrawer date={dayView.date} tasks={dayView.tasks} onClose={() => setDayView(null)} />}
     </>
   );
 }
