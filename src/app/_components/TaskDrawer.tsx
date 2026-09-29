@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { X, Check, Trash2, Plus } from 'lucide-react';
 import { fmtIST, priorityColor, parseTags } from '@/lib/fmt';
 import type { Subtask } from '@/lib/types';
 
 const inputStyle: React.CSSProperties = {
-  background: '#0a0a0a',
-  border: '1px solid #2a2a2a',
-  borderRadius: 6,
-  padding: '8px 10px',
-  color: '#e5e5e5',
+  background: '#0a0a0c',
+  border: '1px solid #25252b',
+  borderRadius: 8,
+  padding: '9px 12px',
+  color: '#f0f0f2',
   fontSize: 14,
   outline: 'none',
   width: '100%',
@@ -17,15 +18,7 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 };
 
-export default function TaskDrawer({
-  taskId,
-  onClose,
-  onChanged,
-}: {
-  taskId: string;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
+export default function TaskDrawer({ taskId, onClose, onChanged }: { taskId: string; onClose: () => void; onChanged: () => void }) {
   const [task, setTask] = useState<any>(null);
   const [subs, setSubs] = useState<Subtask[]>([]);
   const [busy, setBusy] = useState(false);
@@ -54,12 +47,9 @@ export default function TaskDrawer({
     setBusy(true);
     let value: any = draft;
     if (field === 'deadline') {
-      // accept natural language? skip — plain ISO or YYYY-MM-DD HH:MM accepted.
-      // try Date parse first
       const d = new Date(draft);
       if (!isNaN(d.getTime())) value = d.toISOString();
     }
-    if (field === 'tags') value = draft;
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -72,7 +62,6 @@ export default function TaskDrawer({
   }
 
   async function complete() {
-    if (!confirm('Mark this task as done?')) return;
     setBusy(true);
     await fetch(`/api/tasks/${taskId}`, {
       method: 'POST',
@@ -137,11 +126,12 @@ export default function TaskDrawer({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.65)',
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(4px)',
         zIndex: 50,
         display: 'flex',
         justifyContent: 'flex-end',
-        animation: 'fadeIn 0.15s ease-out',
+        animation: 'fadeIn 0.18s ease-out',
       }}
     >
       <div
@@ -149,97 +139,72 @@ export default function TaskDrawer({
         className="drawer-in"
         style={{
           width: '100%',
-          maxWidth: 480,
-          background: '#0f0f0f',
-          borderLeft: '1px solid #1f1f1f',
+          maxWidth: 500,
+          background: '#0a0a0c',
+          borderLeft: '1px solid #1c1c21',
           height: '100vh',
           overflowY: 'auto',
-          padding: 24,
+          padding: 28,
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <code style={{ color: '#888', fontSize: 12 }}>#{taskId}</code>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <code style={{ color: '#5a5a63', fontSize: 12, fontFamily: 'ui-monospace, monospace' }}>#{taskId}</code>
           <button
             onClick={onClose}
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#888',
-              fontSize: 22,
+              color: '#5a5a63',
               cursor: 'pointer',
-              padding: 0,
-              lineHeight: 1,
+              padding: 4,
+              display: 'flex',
             }}
           >
-            ×
+            <X size={18} />
           </button>
         </div>
 
         {!task ? (
           <div>
-            <div className="skeleton" style={{ width: '70%', height: 24, marginBottom: 16 }} />
+            <div className="skeleton" style={{ width: '70%', height: 26, marginBottom: 16 }} />
             <div className="skeleton" style={{ width: '40%', height: 14, marginBottom: 24 }} />
             <div className="skeleton" style={{ width: '100%', height: 60 }} />
           </div>
         ) : (
           <>
-            {/* Title */}
             <EditableField
               value={task.title}
               editing={editing === 'title'}
               draft={draft}
-              busy={busy}
-              onStart={() => startEdit('title', task.title)}
               onChange={setDraft}
               onSave={() => saveEdit('title')}
               onCancel={() => setEditing(null)}
+              onStart={() => startEdit('title', task.title)}
               big
             />
 
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }}>
               <Badge text={task.status} />
               <Badge text={task.priority} color={priorityColor(task.priority)} />
-              {task.recurrence && <Badge text={`🔁 ${task.recurrence}`} color="#4ade80" />}
+              {task.recurrence && <Badge text={`🔁 ${task.recurrence}`} color="#22c55e" />}
               {parseTags(task.tags).map((t) => (
-                <Badge key={t} text={`#${t}`} color="#93c5fd" />
+                <Badge key={t} text={`#${t}`} color="#60a5fa" />
               ))}
             </div>
 
-            {/* Description */}
             <Field label="Description" onEdit={() => startEdit('description', task.description)}>
               {editing === 'description' ? (
-                <InlineEditor
-                  value={draft}
-                  onChange={setDraft}
-                  onSave={() => saveEdit('description')}
-                  onCancel={() => setEditing(null)}
-                  multiline
-                  busy={busy}
-                />
+                <InlineEditor value={draft} onChange={setDraft} onSave={() => saveEdit('description')} onCancel={() => setEditing(null)} multiline busy={busy} />
               ) : (
-                <span style={{ color: task.description ? '#ccc' : '#555', fontSize: 14, whiteSpace: 'pre-wrap' }}>
+                <span style={{ color: task.description ? '#c8c8cf' : '#3e3e45', fontSize: 14, whiteSpace: 'pre-wrap' }}>
                   {task.description || 'Add a description…'}
                 </span>
               )}
             </Field>
 
-            {/* Priority */}
             <Field label="Priority">
               {editing === 'priority' ? (
-                <select
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => saveEdit('priority')}
-                  autoFocus
-                  style={inputStyle}
-                >
+                <select value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => saveEdit('priority')} autoFocus style={inputStyle}>
                   <option value="high">high</option>
                   <option value="med">med</option>
                   <option value="low">low</option>
@@ -247,89 +212,69 @@ export default function TaskDrawer({
               ) : (
                 <span
                   onClick={() => startEdit('priority', task.priority)}
-                  style={{ color: priorityColor(task.priority), fontSize: 14, cursor: 'pointer', textTransform: 'uppercase' }}
+                  style={{
+                    color: priorityColor(task.priority),
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                  }}
                 >
                   {task.priority}
                 </span>
               )}
             </Field>
 
-            {/* Deadline */}
             <Field label="Deadline" onEdit={() => startEdit('deadline', task.deadline)}>
               {editing === 'deadline' ? (
-                <InlineEditor
-                  value={draft}
-                  onChange={setDraft}
-                  onSave={() => saveEdit('deadline')}
-                  onCancel={() => setEditing(null)}
-                  placeholder="2026-10-01 08:00 or ISO"
-                  busy={busy}
-                />
+                <InlineEditor value={draft} onChange={setDraft} onSave={() => saveEdit('deadline')} onCancel={() => setEditing(null)} placeholder="2026-10-01 08:00" busy={busy} />
               ) : (
-                <span style={{ color: task.deadline ? '#ccc' : '#555', fontSize: 14 }}>
+                <span style={{ color: task.deadline ? '#c8c8cf' : '#3e3e45', fontSize: 14 }}>
                   {task.deadline ? fmtIST(task.deadline) : 'Set a deadline…'}
                 </span>
               )}
             </Field>
 
-            {/* Progress */}
             <Field label="Progress" onEdit={() => startEdit('progress', task.progress)}>
               {editing === 'progress' ? (
-                <InlineEditor
-                  value={draft}
-                  onChange={setDraft}
-                  onSave={() => saveEdit('progress')}
-                  onCancel={() => setEditing(null)}
-                  busy={busy}
-                />
+                <InlineEditor value={draft} onChange={setDraft} onSave={() => saveEdit('progress')} onCancel={() => setEditing(null)} busy={busy} />
               ) : (
-                <span style={{ color: task.progress ? '#ccc' : '#555', fontSize: 14 }}>
-                  {task.progress || 'Add progress…'}
-                </span>
+                <span style={{ color: task.progress ? '#c8c8cf' : '#3e3e45', fontSize: 14 }}>{task.progress || 'Add progress…'}</span>
               )}
             </Field>
 
-            {/* Tags */}
             <Field label="Tags" onEdit={() => startEdit('tags', task.tags)}>
               {editing === 'tags' ? (
-                <InlineEditor
-                  value={draft}
-                  onChange={setDraft}
-                  onSave={() => saveEdit('tags')}
-                  onCancel={() => setEditing(null)}
-                  placeholder="work,home,health (comma-separated)"
-                  busy={busy}
-                />
+                <InlineEditor value={draft} onChange={setDraft} onSave={() => saveEdit('tags')} onCancel={() => setEditing(null)} placeholder="work,home" busy={busy} />
               ) : (
-                <span style={{ color: task.tags ? '#ccc' : '#555', fontSize: 14 }}>
-                  {task.tags || 'Add tags…'}
-                </span>
+                <span style={{ color: task.tags ? '#c8c8cf' : '#3e3e45', fontSize: 14 }}>{task.tags || 'Add tags…'}</span>
               )}
             </Field>
 
             <Field label="Created">
-              <span style={{ color: '#888', fontSize: 13 }}>{fmtIST(task.created_at)}</span>
+              <span style={{ color: '#5a5a63', fontSize: 12 }}>{fmtIST(task.created_at)}</span>
             </Field>
 
             {task.completed_at && (
               <Field label="Completed">
-                <span style={{ color: '#16a34a', fontSize: 13 }}>{fmtIST(task.completed_at)}</span>
+                <span style={{ color: '#22c55e', fontSize: 12 }}>{fmtIST(task.completed_at)}</span>
               </Field>
             )}
 
-            {/* Subtasks */}
-            <Field label={`Subtasks (${subs.filter((s) => s.done).length}/${subs.length})`}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+            <Field label={`Subtasks · ${subs.filter((s) => s.done).length}/${subs.length}`}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                 {subs.map((s) => (
                   <div
                     key={s.order}
                     style={{
                       display: 'flex',
-                      gap: 8,
+                      gap: 10,
                       alignItems: 'center',
-                      fontSize: 14,
-                      color: s.done ? '#666' : '#ccc',
+                      fontSize: 13,
+                      color: s.done ? '#5a5a63' : '#c8c8cf',
                       textDecoration: s.done ? 'line-through' : 'none',
+                      padding: '6px 0',
                     }}
                   >
                     <input
@@ -337,25 +282,20 @@ export default function TaskDrawer({
                       checked={s.done}
                       disabled={busy}
                       onChange={(e) => toggleSub(s.order, e.target.checked)}
+                      style={{ accentColor: '#22c55e', cursor: 'pointer' }}
                     />
                     <span style={{ flex: 1 }}>{s.text}</span>
                     <button
                       onClick={() => delSub(s.order)}
                       disabled={busy}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#666',
-                        cursor: 'pointer',
-                        fontSize: 14,
-                      }}
+                      style={{ background: 'transparent', border: 'none', color: '#5a5a63', cursor: 'pointer', display: 'flex', padding: 4 }}
                     >
-                      ×
+                      <X size={12} />
                     </button>
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   placeholder="Add subtask…"
                   value={newSub}
@@ -363,20 +303,65 @@ export default function TaskDrawer({
                   onKeyDown={(e) => e.key === 'Enter' && addSub()}
                   style={{ ...inputStyle, flex: 1 }}
                 />
-                <button onClick={addSub} disabled={busy || !newSub.trim()} style={primaryBtn}>
-                  +
+                <button
+                  onClick={addSub}
+                  disabled={busy || !newSub.trim()}
+                  style={{
+                    background: '#22c55e',
+                    color: '#08080a',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '0 14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Plus size={14} />
                 </button>
               </div>
             </Field>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 24 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 28 }}>
               {task.status !== 'done' && (
-                <button onClick={complete} disabled={busy} style={primaryBtn}>
-                  ✓ Complete
+                <button
+                  onClick={complete}
+                  disabled={busy}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: '#22c55e',
+                    color: '#08080a',
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '10px 16px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Check size={14} />
+                  Complete
                 </button>
               )}
-              <button onClick={del} disabled={busy} style={dangerBtn}>
+              <button
+                onClick={del}
+                disabled={busy}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'transparent',
+                  color: '#f87171',
+                  border: '1px solid #2a1214',
+                  borderRadius: 8,
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={14} />
                 Delete
               </button>
             </div>
@@ -387,39 +372,15 @@ export default function TaskDrawer({
   );
 }
 
-function Field({
-  label,
-  children,
-  onEdit,
-}: {
-  label: string;
-  children: React.ReactNode;
-  onEdit?: () => void;
-}) {
+function Field({ label, children, onEdit }: { label: string; children: React.ReactNode; onEdit?: () => void }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div
-          style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            color: '#666',
-          }}
-        >
-          {label}
-        </div>
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, color: '#5a5a63', fontWeight: 600 }}>{label}</div>
         {onEdit && (
           <button
             onClick={onEdit}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#555',
-              fontSize: 11,
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            style={{ background: 'transparent', border: 'none', color: '#5a5a63', fontSize: 11, cursor: 'pointer', padding: 0 }}
           >
             edit
           </button>
@@ -430,17 +391,7 @@ function Field({
   );
 }
 
-function EditableField({
-  value,
-  editing,
-  draft,
-  onChange,
-  onSave,
-  onCancel,
-  onStart,
-  busy,
-  big,
-}: any) {
+function EditableField({ value, editing, draft, onChange, onSave, onCancel, onStart, big }: any) {
   if (editing) {
     return (
       <input
@@ -452,7 +403,7 @@ function EditableField({
         }}
         onBlur={onSave}
         autoFocus
-        style={{ ...inputStyle, fontSize: big ? 20 : 14, fontWeight: big ? 600 : 400, marginBottom: 12 }}
+        style={{ ...inputStyle, fontSize: big ? 20 : 14, fontWeight: big ? 600 : 400, marginBottom: 14 }}
       />
     );
   }
@@ -460,10 +411,12 @@ function EditableField({
     <h2
       onClick={onStart}
       style={{
-        margin: '0 0 12px',
-        fontSize: big ? 20 : 14,
+        margin: '0 0 14px',
+        fontSize: big ? 22 : 14,
         fontWeight: big ? 600 : 400,
+        letterSpacing: big ? -0.4 : 0,
         cursor: 'text',
+        lineHeight: 1.3,
       }}
     >
       {value}
@@ -496,18 +449,31 @@ function InlineEditor({ value, onChange, onSave, onCancel, placeholder, multilin
           style={inputStyle}
         />
       )}
-      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-        <button onClick={onSave} disabled={busy} style={{ ...primaryBtn, padding: '4px 12px', fontSize: 12 }}>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+        <button
+          onClick={onSave}
+          disabled={busy}
+          style={{
+            background: '#22c55e',
+            color: '#08080a',
+            border: 'none',
+            borderRadius: 6,
+            padding: '5px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
           Save
         </button>
         <button
           onClick={onCancel}
           style={{
             background: 'transparent',
-            border: '1px solid #2a2a2a',
-            color: '#888',
+            border: '1px solid #25252b',
+            color: '#9a9aa3',
             borderRadius: 6,
-            padding: '4px 12px',
+            padding: '5px 12px',
             fontSize: 12,
             cursor: 'pointer',
           }}
@@ -523,36 +489,17 @@ function Badge({ text, color }: { text: string; color?: string }) {
   return (
     <span
       style={{
-        fontSize: 11,
-        padding: '3px 8px',
-        borderRadius: 4,
-        background: '#1a1a1a',
-        color: color ?? '#a3a3a3',
+        fontSize: 10,
+        padding: '4px 9px',
+        borderRadius: 5,
+        background: '#16161a',
+        color: color ?? '#9a9aa3',
         textTransform: 'uppercase',
+        fontWeight: 600,
+        letterSpacing: 0.3,
       }}
     >
       {text}
     </span>
   );
 }
-
-const primaryBtn: React.CSSProperties = {
-  background: '#16a34a',
-  color: '#0a0a0a',
-  border: 'none',
-  borderRadius: 6,
-  padding: '8px 14px',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const dangerBtn: React.CSSProperties = {
-  background: 'transparent',
-  color: '#f87171',
-  border: '1px solid #7f1d1d',
-  borderRadius: 6,
-  padding: '8px 14px',
-  fontSize: 13,
-  cursor: 'pointer',
-};

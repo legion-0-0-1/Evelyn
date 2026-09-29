@@ -1,5 +1,7 @@
 'use client';
 
+import { LogOut } from 'lucide-react';
+
 export default function LogoutButton() {
   async function logout(e: React.MouseEvent) {
     e.preventDefault();
@@ -7,12 +9,23 @@ export default function LogoutButton() {
     window.location.href = '/login';
   }
   return (
-    <a
-      href="/api/logout"
+    <button
       onClick={logout}
-      style={{ color: '#666', fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        background: 'transparent',
+        border: '1px solid #25252b',
+        color: '#9a9aa3',
+        borderRadius: 8,
+        padding: '8px 12px',
+        fontSize: 12,
+        cursor: 'pointer',
+      }}
     >
-      logout
-    </a>
+      <LogOut size={14} />
+      Sign out
+    </button>
   );
 }

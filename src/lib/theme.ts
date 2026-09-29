@@ -1,0 +1,50 @@
+export const theme = {
+  bg: {
+    base: '#08080a',
+    surface: '#0f0f12',
+    elevated: '#16161a',
+    hover: '#1c1c21',
+  },
+  border: {
+    subtle: '#1c1c21',
+    default: '#25252b',
+    strong: '#33333b',
+  },
+  text: {
+    primary: '#f0f0f2',
+    secondary: '#9a9aa3',
+    tertiary: '#5a5a63',
+    muted: '#3e3e45',
+  },
+  accent: {
+    primary: '#22c55e',
+    primaryDim: '#16a34a',
+    primaryBg: '#0f2a1a',
+    primaryBorder: '#1e5c32',
+  },
+  status: {
+    high: '#f87171',
+    highBg: '#2a1214',
+    med: '#a3a3a8',
+    medBg: '#1a1a1d',
+    low: '#6b6b73',
+    lowBg: '#161618',
+    done: '#22c55e',
+    doneBg: '#0f2a1a',
+    progress: '#f59e0b',
+    progressBg: '#2a1f0a',
+    overdue: '#ef4444',
+    overdueBg: '#2a0f0f',
+  },
+  radius: {
+    sm: 6,
+    md: 10,
+    lg: 14,
+    xl: 18,
+  },
+  shadow: {
+    sm: '0 1px 2px rgba(0,0,0,0.4)',
+    md: '0 4px 12px rgba(0,0,0,0.4)',
+    lg: '0 12px 32px rgba(0,0,0,0.5)',
+  },
+};

@@ -34,7 +34,7 @@ export default function Dashboard() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.set('status', filters.status);
+      params.set('status', view === 'kanban' ? 'all' : filters.status);
       if (filters.priority) params.set('priority', filters.priority);
       if (filters.tag) params.set('tag', filters.tag);
       if (filters.q) params.set('q', filters.q);
@@ -61,7 +61,7 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, view]);
 
   return (
     <>
@@ -70,7 +70,7 @@ export default function Dashboard() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(280px, 1fr) minmax(0, 2fr)',
+          gridTemplateColumns: 'minmax(300px, 1.1fr) minmax(0, 1.9fr)',
           gap: 16,
           marginBottom: 24,
         }}
@@ -84,12 +84,23 @@ export default function Dashboard() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: 12,
-          gap: 8,
+          marginBottom: 16,
+          gap: 12,
+          flexWrap: 'wrap',
         }}
       >
         <Filters filters={filters} onChange={setFilters} allTags={allTags} />
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 2,
+            flexShrink: 0,
+            background: '#0f0f12',
+            border: '1px solid #1c1c21',
+            borderRadius: 8,
+            padding: 3,
+          }}
+        >
           <ViewBtn active={view === 'list'} onClick={() => setView('list')}>
             List
           </ViewBtn>
@@ -105,9 +116,9 @@ export default function Dashboard() {
             padding: 16,
             background: '#2a0f0f',
             border: '1px solid #7f1d1d',
-            borderRadius: 8,
+            borderRadius: 10,
             color: '#fca5a5',
-            fontSize: 14,
+            fontSize: 13,
             marginBottom: 20,
           }}
         >
@@ -141,13 +152,13 @@ function ViewBtn({
     <button
       onClick={onClick}
       style={{
-        background: active ? '#16a34a' : 'transparent',
-        color: active ? '#0a0a0a' : '#888',
-        border: active ? 'none' : '1px solid #2a2a2a',
+        background: active ? '#16161a' : 'transparent',
+        color: active ? '#f0f0f2' : '#5a5a63',
+        border: 'none',
         borderRadius: 6,
-        padding: '8px 12px',
+        padding: '6px 14px',
         fontSize: 12,
-        fontWeight: 600,
+        fontWeight: 500,
         cursor: 'pointer',
       }}
     >
