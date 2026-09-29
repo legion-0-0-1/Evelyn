@@ -45,3 +45,8 @@ export function priorityColor(p: string): string {
   if (p === 'low') return '#737373';
   return '#a3a3a3';
 }
+
+export function parseTags(raw: string): string[] {
+  if (!raw) return [];
+  return raw.split(',').map((t) => t.trim()).filter(Boolean);
+}

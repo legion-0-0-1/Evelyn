@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dayView, setDayView] = useState<{ date: string; tasks: any[] } | null>(null);
+  const [view, setView] = useState<'list' | 'kanban'>('list');
 
   async function load() {
     setLoading(true);
@@ -78,7 +79,25 @@ export default function Dashboard() {
         <Charts />
       </div>
 
-      <Filters filters={filters} onChange={setFilters} allTags={allTags} />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+          gap: 8,
+        }}
+      >
+        <Filters filters={filters} onChange={setFilters} allTags={allTags} />
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <ViewBtn active={view === 'list'} onClick={() => setView('list')}>
+            List
+          </ViewBtn>
+          <ViewBtn active={view === 'kanban'} onClick={() => setView('kanban')}>
+            Kanban
+          </ViewBtn>
+        </div>
+      </div>
 
       {error && (
         <div
@@ -96,9 +115,43 @@ export default function Dashboard() {
         </div>
       )}
 
-      <TaskList tasks={tasks} loading={loading} onRefresh={load} />
+      <TaskList
+        tasks={tasks}
+        loading={loading}
+        onRefresh={load}
+        onTagClick={(tag) => setFilters({ ...filters, tag })}
+        view={view}
+      />
 
       {dayView && <DayDrawer date={dayView.date} tasks={dayView.tasks} onClose={() => setDayView(null)} />}
     </>
+  );
+}
+
+function ViewBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? '#16a34a' : 'transparent',
+        color: active ? '#0a0a0a' : '#888',
+        border: active ? 'none' : '1px solid #2a2a2a',
+        borderRadius: 6,
+        padding: '8px 12px',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
   );
 }

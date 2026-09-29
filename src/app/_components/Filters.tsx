@@ -19,6 +19,7 @@ export default function Filters({
     color: '#e5e5e5',
     fontSize: 13,
     outline: 'none',
+    fontFamily: 'inherit',
   };
 
   return (
@@ -27,8 +28,9 @@ export default function Filters({
         display: 'flex',
         gap: 8,
         flexWrap: 'wrap',
-        marginBottom: 20,
         alignItems: 'center',
+        flex: 1,
+        minWidth: 0,
       }}
     >
       <select
@@ -70,7 +72,7 @@ export default function Filters({
         placeholder="Search…"
         value={filters.q}
         onChange={(e) => onChange({ ...filters, q: e.target.value })}
-        style={{ ...inputStyle, minWidth: 180, flex: 1 }}
+        style={{ ...inputStyle, minWidth: 160, flex: 1 }}
       />
 
       {(filters.priority || filters.tag || filters.q || filters.status !== 'active') && (
