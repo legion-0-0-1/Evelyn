@@ -12,6 +12,10 @@ import {
   getSetting,
   setSetting,
   getLogs,
+  getSubtasks,
+  addSubtask,
+  setSubtaskDone,
+  deleteSubtask,
   parseTags,
   taskTags,
   type Task,
@@ -92,16 +96,16 @@ export async function POST(req: NextRequest) {
           await send(chatId, 'Usage: `/add <title> ; <deadline> ; [recurrence]`\nModifiers: `!high` `!low`, `#tag`');
           break;
         }
-        const parts = args.split(';').map((s) => s.trim());
-        const [titleRaw, deadlineRaw, recurrence] = parts;
-        const parsed = extractModifiers(titleRaw);
+        const pre = extractModifiers(args);
+        const parts = pre.title.split(';').map((s) => s.trim());
+        const [title, deadlineRaw, recurrence] = parts;
         const dl = deadlineRaw ? parseIST(deadlineRaw) : null;
         const task = await addTask({
-          title: parsed.title,
+          title,
           deadline: dl ? dl.toISOString() : '',
-          priority: parsed.priority,
+          priority: pre.priority,
           recurrence,
-          tags: parsed.tags,
+          tags: pre.tags,
         });
         await send(chatId, `✅ Added:\n${fmtTask(task)}`);
         break;
@@ -111,7 +115,16 @@ export async function POST(req: NextRequest) {
         const greet = await maybeGreet(chatId);
         const tasks = await getActiveTasks();
         if (!tasks.length) { await send(chatId, `${greet}Nothing active. 🎉`); break; }
-        await send(chatId, `${greet}📋 *Active tasks:*\n\n${tasks.map(fmtTask).join('\n')}`);
+        const lines: string[] = [];
+        for (const t of tasks) {
+          lines.push(fmtTask(t));
+          const subs = await getSubtasks(t.id);
+          if (subs.length) {
+            const doneCount = subs.filter((s) => s.done).length;
+            lines.push(`   └ ${doneCount}/${subs.length} subtasks`);
+          }
+        }
+        await send(chatId, `${greet}📋 *Active tasks:*\n\n${lines.join('\n')}`);
         break;
       }
 
@@ -142,7 +155,17 @@ export async function POST(req: NextRequest) {
 
       case '/done': {
         if (!args) { await send(chatId, 'Usage: `/done <#id>`'); break; }
-        const result = await completeTask(cleanId(args));
+        const id = cleanId(args);
+        const subs = await getSubtasks(id);
+        const open = subs.filter((s) => !s.done);
+        if (open.length) {
+          await send(
+            chatId,
+            `⚠️ *${open.length}* open subtask${open.length === 1 ? '' : 's'}:\n${open.map((s) => `· ${s.text}`).join('\n')}\n\nSend \`/done ${id} force\` to complete anyway.`
+          );
+          break;
+        }
+        const result = await completeTask(id);
         if (!result) { await send(chatId, '❌ Task not found.'); break; }
         if (result.recurring) {
           await send(chatId, `🔁 Done. Rescheduled to *${fmtIST(result.task.deadline)}*:\n${fmtTask(result.task)}`);
@@ -189,7 +212,7 @@ export async function POST(req: NextRequest) {
 
       case '/edit': {
         const firstSpace = args.indexOf(' ');
-        if (firstSpace === -1) { await send(chatId, 'Usage: `/edit <#id> <field> <value>`\nFields: title, deadline, description, progress, tags'); break; }
+        if (firstSpace === -1) { await send(chatId, 'Usage: `/edit <#id> <field> <value>`'); break; }
         const idRaw = args.slice(0, firstSpace);
         const remainder = args.slice(firstSpace + 1).trim();
         const fieldSpace = remainder.indexOf(' ');
@@ -244,23 +267,63 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case '/sub': {
+        const sp = args.indexOf(' ');
+        if (sp === -1) { await send(chatId, 'Usage: `/sub <#id> <text>`'); break; }
+        const id = cleanId(args.slice(0, sp));
+        const subText = args.slice(sp + 1).trim();
+        const parent = (await getTasks()).find((t) => t.id === id);
+        if (!parent) { await send(chatId, '❌ Task not found.'); break; }
+        const sub = await addSubtask(id, subText);
+        await send(chatId, `➕ *${parent.title}*\n  #${sub.order} ${sub.text}`);
+        break;
+      }
+
+      case '/subs': {
+        if (!args) { await send(chatId, 'Usage: `/subs <#id>`'); break; }
+        const id = cleanId(args);
+        const parent = (await getTasks()).find((t) => t.id === id);
+        if (!parent) { await send(chatId, '❌ Task not found.'); break; }
+        const subs = await getSubtasks(id);
+        if (!subs.length) { await send(chatId, `No subtasks on *#${id} ${parent.title}*.`); break; }
+        const lines = subs.map((s) => `${s.done ? '✅' : '⬜'} ${s.order}. ${s.text}`);
+        await send(chatId, `*#${id} ${parent.title}*\n\n${lines.join('\n')}`);
+        break;
+      }
+
+      case '/subdone': {
+        const [idRaw, nRaw] = args.split(' ');
+        const n = Number(nRaw);
+        if (!idRaw || !n) { await send(chatId, 'Usage: `/subdone <#id> <n>`'); break; }
+        const ok = await setSubtaskDone(cleanId(idRaw), n, true);
+        await send(chatId, ok ? `✅ Subtask ${n} done.` : '❌ Subtask not found.');
+        break;
+      }
+
+      case '/subdel': {
+        const [idRaw, nRaw] = args.split(' ');
+        const n = Number(nRaw);
+        if (!idRaw || !n) { await send(chatId, 'Usage: `/subdel <#id> <n>`'); break; }
+        const ok = await deleteSubtask(cleanId(idRaw), n);
+        await send(chatId, ok ? `🗑️ Subtask ${n} deleted.` : '❌ Subtask not found.');
+        break;
+      }
+
       case '/stats': {
         const tasks = await getTasks();
         const logs = await getLogs();
         const now = new Date();
         const todayKey = now.toISOString().slice(0, 10);
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+        const monthAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
 
         const active = tasks.filter((t) => t.status !== 'done');
         const done = tasks.filter((t) => t.status === 'done');
         const overdue = active.filter((t) => t.deadline && t.deadline < now.toISOString() && !t.deadline.startsWith(todayKey));
-
         const completions = logs.filter((l) => l.action === 'task_completed' || l.action === 'task_completed_recurring');
         const thisWeek = completions.filter((l) => l.timestamp >= weekAgo).length;
         const thisMonth = completions.filter((l) => l.timestamp >= monthAgo).length;
 
-        // streak: consecutive days up to today with at least one completion
         const completionDays = new Set(completions.map((l) => l.timestamp.slice(0, 10)));
         let streak = 0;
         const d = new Date();
@@ -314,21 +377,22 @@ export async function POST(req: NextRequest) {
           [
             '*Evelyn commands*',
             '',
-            '`/add <title> ; <deadline> ; [recurrence]` — add task',
-            '  · `!high` `!low` for priority, `#tag` for tags',
+            '`/add <title> ; <deadline> ; [recurrence]`',
+            '  · `!high` `!low`, `#tag`',
             '`/list` — active tasks',
             '`/today` — overdue + today + upcoming',
-            '`/tag <tag>` — filter by tag',
-            '`/tags` — all tags in use',
-            '`/search <query>` — find tasks',
+            '`/tag <tag>` · `/tags`',
+            '`/search <query>`',
             '`/progress <#id> <note>`',
             '`/priority <#id> high|med|low`',
             '`/snooze <#id> <1h|2d|1w>`',
             '`/edit <#id> <field> <value>`',
-            '`/done <#id>` — completes or reschedules',
+            '`/sub <#id> <text>` · `/subs <#id>`',
+            '`/subdone <#id> <n>` · `/subdel <#id> <n>`',
+            '`/done <#id>`',
             '`/delete <#id>`',
-            '`/stats` — completion stats',
-            '`/clear [count]` — delete last N bot msgs',
+            '`/stats`',
+            '`/clear [count]`',
           ].join('\n')
         );
       }

@@ -26,6 +26,8 @@ async function getSheet(name: string) {
   return doc.sheetsByTitle[name];
 }
 
+/* ---------- Types ---------- */
+
 export type Task = {
   id: string;
   title: string;
@@ -42,6 +44,15 @@ export type Task = {
   completed_display: string;
   tags: string;
 };
+
+export type Subtask = {
+  task_id: string;
+  order: number;
+  text: string;
+  done: boolean;
+};
+
+/* ---------- Tasks ---------- */
 
 function rowToTask(row: GoogleSpreadsheetRow): Task {
   return {
@@ -63,10 +74,7 @@ function rowToTask(row: GoogleSpreadsheetRow): Task {
 }
 
 export function parseTags(raw: string): string[] {
-  return raw
-    .split(',')
-    .map((t) => t.trim())
-    .filter(Boolean);
+  return raw.split(',').map((t) => t.trim()).filter(Boolean);
 }
 
 export function taskTags(t: Task): string[] {
@@ -180,6 +188,17 @@ export async function deleteTask(id: string): Promise<boolean> {
   const row = rows.find((r) => String(r.get('id')) === String(id));
   if (!row) return false;
   await row.delete();
+
+  // cascade-delete subtasks
+  const subtasks = await getSubtasks(id);
+  if (subtasks.length) {
+    const subSheet = await getSheet('Subtasks');
+    const subRows = await subSheet.getRows();
+    for (const r of subRows) {
+      if (String(r.get('task_id')) === String(id)) await r.delete();
+    }
+  }
+
   await appendLog('task_deleted', id, '');
   return true;
 }
@@ -205,6 +224,57 @@ export async function getLogs() {
     task_id: String(r.get('task_id') ?? ''),
     details: String(r.get('details') ?? ''),
   }));
+}
+
+/* ---------- Subtasks ---------- */
+
+function rowToSubtask(row: GoogleSpreadsheetRow): Subtask {
+  return {
+    task_id: String(row.get('task_id') ?? ''),
+    order: Number(row.get('order') ?? 0),
+    text: String(row.get('text') ?? ''),
+    done: String(row.get('done')).toLowerCase() === 'true',
+  };
+}
+
+export async function getSubtasks(task_id: string): Promise<Subtask[]> {
+  const sheet = await getSheet('Subtasks');
+  const rows = await sheet.getRows();
+  return rows
+    .map(rowToSubtask)
+    .filter((s) => s.task_id === String(task_id))
+    .sort((a, b) => a.order - b.order);
+}
+
+export async function addSubtask(task_id: string, text: string): Promise<Subtask> {
+  const sheet = await getSheet('Subtasks');
+  const existing = await getSubtasks(task_id);
+  const order = existing.length ? Math.max(...existing.map((s) => s.order)) + 1 : 1;
+  const sub = { task_id: String(task_id), order, text, done: 'false' };
+  await sheet.addRow(sub);
+  await appendLog('subtask_added', task_id, `#${order} ${text}`);
+  return { task_id: String(task_id), order, text, done: false };
+}
+
+export async function setSubtaskDone(task_id: string, order: number, done: boolean): Promise<boolean> {
+  const sheet = await getSheet('Subtasks');
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => String(r.get('task_id')) === String(task_id) && Number(r.get('order')) === order);
+  if (!row) return false;
+  row.set('done', String(done));
+  await row.save();
+  await appendLog(done ? 'subtask_done' : 'subtask_undone', task_id, `#${order}`);
+  return true;
+}
+
+export async function deleteSubtask(task_id: string, order: number): Promise<boolean> {
+  const sheet = await getSheet('Subtasks');
+  const rows = await sheet.getRows();
+  const row = rows.find((r) => String(r.get('task_id')) === String(task_id) && Number(r.get('order')) === order);
+  if (!row) return false;
+  await row.delete();
+  await appendLog('subtask_deleted', task_id, `#${order}`);
+  return true;
 }
 
 /* ---------- Messages ---------- */
@@ -276,23 +346,9 @@ export function nextOccurrence(currentIso: string, recurrence: string): Date | n
     return d;
   }
 
-  if (rec === 'daily') {
-    const d = new Date(base);
-    d.setDate(d.getDate() + 1);
-    return d;
-  }
-
-  if (rec === 'weekly') {
-    const d = new Date(base);
-    d.setDate(d.getDate() + 7);
-    return d;
-  }
-
-  if (rec === 'monthly') {
-    const d = new Date(base);
-    d.setMonth(d.getMonth() + 1);
-    return d;
-  }
+  if (rec === 'daily') { const d = new Date(base); d.setDate(d.getDate() + 1); return d; }
+  if (rec === 'weekly') { const d = new Date(base); d.setDate(d.getDate() + 7); return d; }
+  if (rec === 'monthly') { const d = new Date(base); d.setMonth(d.getMonth() + 1); return d; }
 
   const nthMatch = rec.match(/^monthly\s+(first|second|third|fourth|last|1st|2nd|3rd|4th)\s+([a-z]+)$/);
   if (nthMatch) {
@@ -301,11 +357,8 @@ export function nextOccurrence(currentIso: string, recurrence: string): Date | n
     const weekday = WEEKDAYS.findIndex((w) => w.startsWith(wdRaw.slice(0, 3)));
     if (weekday === -1) return null;
     const ordMap: Record<string, number> = {
-      first: 1, '1st': 1,
-      second: 2, '2nd': 2,
-      third: 3, '3rd': 3,
-      fourth: 4, '4th': 4,
-      last: -1,
+      first: 1, '1st': 1, second: 2, '2nd': 2,
+      third: 3, '3rd': 3, fourth: 4, '4th': 4, last: -1,
     };
     const ord = ordMap[ordRaw];
     if (ord === undefined) return null;
@@ -319,7 +372,6 @@ function nthWeekdayOfMonth(base: Date, weekday: number, ord: number): Date {
   const y = base.getUTCFullYear();
   const m = base.getUTCMonth() + 1;
   const target = new Date(Date.UTC(y, m, 1, base.getUTCHours(), base.getUTCMinutes(), 0, 0));
-
   if (ord === -1) {
     const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0));
     const diff = (lastDay.getUTCDay() - weekday + 7) % 7;
@@ -327,7 +379,6 @@ function nthWeekdayOfMonth(base: Date, weekday: number, ord: number): Date {
     lastDay.setUTCHours(base.getUTCHours(), base.getUTCMinutes(), 0, 0);
     return lastDay;
   }
-
   const diff = (weekday - target.getUTCDay() + 7) % 7;
   target.setUTCDate(1 + diff + (ord - 1) * 7);
   return target;
