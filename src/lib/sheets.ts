@@ -1,6 +1,5 @@
 import { GoogleSpreadsheet, GoogleSpreadsheetRow } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
-import { nanoid } from 'nanoid';
 import { fmtIST } from './greetings';
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -41,11 +40,12 @@ export type Task = {
   deadline_display: string;
   created_display: string;
   completed_display: string;
+  tags: string;
 };
 
 function rowToTask(row: GoogleSpreadsheetRow): Task {
   return {
-    id: row.get('id'),
+    id: String(row.get('id') ?? ''),
     title: row.get('title'),
     description: row.get('description'),
     deadline: row.get('deadline'),
@@ -58,7 +58,19 @@ function rowToTask(row: GoogleSpreadsheetRow): Task {
     deadline_display: row.get('deadline_display') ?? '',
     created_display: row.get('created_display') ?? '',
     completed_display: row.get('completed_display') ?? '',
+    tags: row.get('tags') ?? '',
   };
+}
+
+export function parseTags(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+export function taskTags(t: Task): string[] {
+  return parseTags(t.tags);
 }
 
 export async function getTasks(): Promise<Task[]> {
@@ -74,17 +86,26 @@ export async function getActiveTasks(): Promise<Task[]> {
     .sort((a, b) => (a.deadline || 'z').localeCompare(b.deadline || 'z'));
 }
 
+async function nextId(): Promise<string> {
+  const tasks = await getTasks();
+  const nums = tasks.map((t) => parseInt(t.id, 10)).filter((n) => !isNaN(n));
+  const max = nums.length ? Math.max(...nums) : 0;
+  return String(max + 1);
+}
+
 export async function addTask(input: {
   title: string;
   description?: string;
   deadline?: string;
   priority?: 'low' | 'med' | 'high';
   recurrence?: string;
+  tags?: string[];
 }): Promise<Task> {
   const sheet = await getSheet('Tasks');
   const nowIso = new Date().toISOString();
+  const id = await nextId();
   const task = {
-    id: nanoid(6).toLowerCase(),
+    id,
     title: input.title,
     description: input.description ?? '',
     deadline: input.deadline ?? '',
@@ -97,21 +118,23 @@ export async function addTask(input: {
     deadline_display: fmtIST(input.deadline ?? ''),
     created_display: fmtIST(nowIso),
     completed_display: '',
+    tags: (input.tags ?? []).join(','),
   };
   await sheet.addRow(task);
-  await appendLog('task_created', task.id, `${task.title} | ${task.deadline} | ${task.recurrence}`);
+  await appendLog('task_created', id, `${task.title} | ${task.deadline} | ${task.recurrence}`);
   return task as Task;
 }
 
 export async function updateTask(id: string, patch: Partial<Task>): Promise<Task | null> {
   const sheet = await getSheet('Tasks');
   const rows = await sheet.getRows();
-  const row = rows.find((r) => r.get('id') === id);
+  const row = rows.find((r) => String(r.get('id')) === String(id));
   if (!row) return null;
 
   const merged: any = { ...patch };
   if (patch.deadline !== undefined) merged.deadline_display = fmtIST(patch.deadline);
   if (patch.completed_at !== undefined) merged.completed_display = fmtIST(patch.completed_at);
+  if (patch.tags !== undefined && Array.isArray(patch.tags)) merged.tags = patch.tags.join(',');
 
   for (const [k, v] of Object.entries(merged)) row.set(k, v);
   await row.save();
@@ -123,7 +146,7 @@ export async function updateTask(id: string, patch: Partial<Task>): Promise<Task
 export async function completeTask(id: string): Promise<{ task: Task; recurring: boolean } | null> {
   const sheet = await getSheet('Tasks');
   const rows = await sheet.getRows();
-  const row = rows.find((r) => r.get('id') === id);
+  const row = rows.find((r) => String(r.get('id')) === String(id));
   if (!row) return null;
   const task = rowToTask(row);
 
@@ -154,7 +177,7 @@ export async function completeTask(id: string): Promise<{ task: Task; recurring:
 export async function deleteTask(id: string): Promise<boolean> {
   const sheet = await getSheet('Tasks');
   const rows = await sheet.getRows();
-  const row = rows.find((r) => r.get('id') === id);
+  const row = rows.find((r) => String(r.get('id')) === String(id));
   if (!row) return false;
   await row.delete();
   await appendLog('task_deleted', id, '');
@@ -173,7 +196,18 @@ export async function appendLog(action: string, task_id: string, details: string
   });
 }
 
-/* ---------- Messages log for /clear ---------- */
+export async function getLogs() {
+  const sheet = await getSheet('Logs');
+  const rows = await sheet.getRows();
+  return rows.map((r) => ({
+    timestamp: String(r.get('timestamp') ?? ''),
+    action: String(r.get('action') ?? ''),
+    task_id: String(r.get('task_id') ?? ''),
+    details: String(r.get('details') ?? ''),
+  }));
+}
+
+/* ---------- Messages ---------- */
 
 export async function logMessage(chat_id: string, message_id: number, direction: 'in' | 'out') {
   const sheet = await getSheet('Messages');
@@ -204,7 +238,7 @@ export async function clearMessageLog(chat_id: string) {
   }
 }
 
-/* ---------- Settings (for greeting-once-per-bucket) ---------- */
+/* ---------- Settings ---------- */
 
 export async function getSetting(key: string): Promise<string | null> {
   const sheet = await getSheet('Settings');
@@ -225,15 +259,14 @@ export async function setSetting(key: string, value: string) {
   }
 }
 
-/* ---------- Recurrence engine ---------- */
+/* ---------- Recurrence ---------- */
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
-function nextOccurrence(currentIso: string, recurrence: string): Date | null {
+export function nextOccurrence(currentIso: string, recurrence: string): Date | null {
   const base = currentIso ? new Date(currentIso) : new Date();
   const rec = recurrence.trim().toLowerCase();
 
-  // every N days / every N weeks
   const everyMatch = rec.match(/^every\s+(\d+)\s+(day|days|week|weeks)$/);
   if (everyMatch) {
     const n = Number(everyMatch[1]);
@@ -261,7 +294,6 @@ function nextOccurrence(currentIso: string, recurrence: string): Date | null {
     return d;
   }
 
-  // monthly <ordinal> <weekday>   e.g. "monthly first monday", "monthly last friday"
   const nthMatch = rec.match(/^monthly\s+(first|second|third|fourth|last|1st|2nd|3rd|4th)\s+([a-z]+)$/);
   if (nthMatch) {
     const ordRaw = nthMatch[1];
@@ -284,13 +316,11 @@ function nextOccurrence(currentIso: string, recurrence: string): Date | null {
 }
 
 function nthWeekdayOfMonth(base: Date, weekday: number, ord: number): Date {
-  // Start from next month relative to base
   const y = base.getUTCFullYear();
-  const m = base.getUTCMonth() + 1; // next month (0-indexed month)
+  const m = base.getUTCMonth() + 1;
   const target = new Date(Date.UTC(y, m, 1, base.getUTCHours(), base.getUTCMinutes(), 0, 0));
 
   if (ord === -1) {
-    // last <weekday> of month
     const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0));
     const diff = (lastDay.getUTCDay() - weekday + 7) % 7;
     lastDay.setUTCDate(lastDay.getUTCDate() - diff);
